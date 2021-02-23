@@ -13,6 +13,7 @@ pub struct Clocks {
     pub(crate) apb0: Hertz,
     pub(crate) apb1: Hertz,
     pub(crate) apb2: Hertz,
+    pub(crate) pll0: Hertz,
 }
 
 impl Clocks {
@@ -32,6 +33,7 @@ impl Clocks {
             apb0: Hertz(195_000_000),
             apb1: Hertz(195_000_000),
             apb2: Hertz(195_000_000),
+            pll0: Hertz(806_000_000),
         }
     }
 
@@ -53,5 +55,10 @@ impl Clocks {
     /// Returns APB2 frequency
     pub fn apb2(&self) -> Hertz {
         self.apb2
+    }
+
+    /// Returns APB2 frequency
+    pub fn pll0(&self) -> Hertz {
+        self.pll0
     }
 }

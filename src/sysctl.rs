@@ -103,6 +103,7 @@ impl Parts {
             apb0: self.apb0.get_frequency(),
             apb1: self.apb1.get_frequency(),
             apb2: self.apb2.get_frequency(),
+            pll0: self.pll0.get_frequency(),
         }
     }
 }
