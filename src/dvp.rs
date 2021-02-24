@@ -1,4 +1,5 @@
 use crate::clock::Clocks;
+use crate::sleep::usleep;
 use crate::sysctl;
 use crate::time::Hertz;
 use k210_pac as pac;
@@ -91,13 +92,19 @@ impl Dvp {
         self.dvp.sccb_cfg.read().rdata().bits()
     }
 
+    /// Power down then reset
     pub fn reset(&self) {
         self.dvp.cmos_cfg.modify(|_, w| w.power_down().set_bit());
+        usleep(2000);
         self.dvp.cmos_cfg.modify(|_, w| w.power_down().clear_bit());
+        usleep(2000);
         self.dvp.cmos_cfg.modify(|_, w| w.reset().clear_bit());
+        usleep(2000);
         self.dvp.cmos_cfg.modify(|_, w| w.reset().set_bit());
+        usleep(2000);
     }
 
+    /// Init DVP peripheral (enabling clock and initial reset/settings)
     pub fn init(&self) {
         // Consider borrowing i.s.o. using global instance of sysctl?
         sysctl::clk_en_peri().modify(|_, w| w.dvp_clk_en().set_bit());
@@ -114,6 +121,7 @@ impl Dvp {
         self.reset();
     }
 
+    /// Set XCLK clock rate
     pub fn set_xclk_rate(&self, xclk_rate: Hertz, clock: &Clocks) -> Hertz {
         let apb1_clk = clock.apb1().0;
         let period = if apb1_clk > xclk_rate.0 * 2 {
@@ -133,6 +141,7 @@ impl Dvp {
         Hertz(apb1_clk / (period + 1) / 2)
     }
 
+    /// Set image size with burst mode options
     pub fn set_image_size(&self, burst_mode: bool, width: u16, height: u16) {
         use pac::dvp::axi::GM_MLEN_A::*;
         let burst_num = if burst_mode {
@@ -158,10 +167,12 @@ impl Dvp {
         }
     }
 
+    /// Set image format: RGB, YUV or Y
     pub fn set_image_format(&self, format: ImageFormat) {
         self.dvp.dvp_cfg.modify(|_, w| w.format().variant(format));
     }
 
+    /// Set display address and enable output into display
     pub fn set_display_addr(&self, addr: Option<*mut u32>) {
         unsafe {
             if let Some(addr) = addr {
@@ -179,10 +190,12 @@ impl Dvp {
         }
     }
 
+    /// Enable or disable auto mode
     pub fn set_auto(&self, status: bool) {
         self.dvp.dvp_cfg.modify(|_, w| w.auto_enable().bit(status));
     }
 
+    /// Begin image retrieval into a specfied address
     pub fn get_image(&self) {
         while !self.dvp.sts.read().frame_start().bit() {
             // IDLE
