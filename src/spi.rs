@@ -1,8 +1,7 @@
-//! (TODO) Serial Peripheral Interface (SPI)
-
 use crate::clock::Clocks;
+use crate::dmac::{Dmac, DmacChannel, Inc, Msize, TrWidth};
 use crate::pac::SPI0;
-use crate::sysctl::{self, APB2};
+use crate::sysctl::{self, DmaSelect, APB2};
 use crate::time::Hertz;
 pub use embedded_hal::spi::{Mode, Phase, Polarity};
 
@@ -45,6 +44,7 @@ pub trait Spi {
     );
     fn set_clk_rate(&mut self, spi_clk: Hertz, clocks: &Clocks) -> Hertz;
     fn send_data<X: Into<u32> + Copy>(&mut self, chip_select: u8, tx: &[X]);
+    fn send_data_dma(&mut self, dmac: &mut Dmac, channel: DmacChannel, chip_select: u8, tx: &[u32]);
 }
 
 impl Spi for Spi0 {
@@ -129,6 +129,44 @@ impl Spi for Spi0 {
                 self.spi.dr[0].write(|w| w.bits(val.into()));
                 fifo_len -= 1;
             }
+
+            while (self.spi.sr.read().bits() & 0x05) != 0x04 {
+                // IDLE
+            }
+
+            self.spi.ser.write(|w| w.bits(0x00));
+            self.spi.ssienr.write(|w| w.bits(0x00));
+        }
+    }
+
+    fn send_data_dma(
+        &mut self,
+        dmac: &mut Dmac,
+        channel: DmacChannel,
+        chip_select: u8,
+        tx: &[u32],
+    ) {
+        unsafe {
+            self.spi.dmacr.write(|w| w.bits(0x2));
+            self.spi.ssienr.write(|w| w.bits(0x1));
+
+            sysctl::set_dma_sel(channel, DmaSelect::SSI0_TX_REQ);
+            dmac.set_single_mode(
+                channel,
+                tx.as_ptr() as u64,
+                self.spi.dr.as_ptr() as u64,
+                Inc::INCREMENT,
+                Inc::NOCHANGE,
+                TrWidth::WIDTH_32,
+                Msize::LENGTH_4,
+                tx.len() as u32,
+            );
+
+            self.spi.ser.write(|w| w.bits(1 << chip_select));
+
+            // this line of code is busy waiting
+            // @todo -> remove busy waiting
+            dmac.wait_done(channel);
 
             while (self.spi.sr.read().bits() & 0x05) != 0x04 {
                 // IDLE
