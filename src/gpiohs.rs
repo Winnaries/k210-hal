@@ -47,6 +47,13 @@ impl<MODE> Gpiohs0<MODE> {
         Gpiohs0 { _mode: PhantomData }
     }
 
+    pub fn into_output(self) -> Gpiohs0<Output<Floating>> {
+        GPIOHS::set_output_en(0, true);
+        GPIOHS::set_input_en(0, false);
+        GPIOHS::set_pullup_en(0, false);
+        Gpiohs0 { _mode: PhantomData }
+    }
+
     // todo: all modes
 }
 
